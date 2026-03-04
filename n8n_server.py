@@ -6,6 +6,7 @@ Uses fastmcp for easy HTTP transport support
 
 import os
 import json
+import asyncio
 from typing import Any, Optional
 from dotenv import load_dotenv
 
@@ -107,8 +108,7 @@ async def create_workflow(
     name: str,
     nodes: Optional[list] = None,
     connections: Optional[dict] = None,
-    settings: Optional[dict] = None,
-    tags: Optional[list[str]] = None
+    settings: Optional[dict] = None
 ) -> str:
     """
     Create a new workflow in n8n.
@@ -118,7 +118,6 @@ async def create_workflow(
         nodes: List of node objects with id, name, type, position, parameters, etc.
         connections: Connection definitions between nodes
         settings: Optional workflow settings (executionOrder, saveManualExecutions, etc.)
-        tags: Optional list of tag IDs to associate with the workflow
 
     Returns:
         JSON string with created workflow details
@@ -134,13 +133,12 @@ async def create_workflow(
         }
     ]
     """
-    # Note: 'active' field is read-only when creating workflows
+    # Note: 'active' and 'tags' fields are read-only when creating workflows
     workflow_data = {
         "name": name,
         "nodes": nodes or [],
         "connections": connections or {},
-        "settings": settings or {},
-        "tags": tags or []
+        "settings": settings or {}
     }
 
     async with httpx.AsyncClient(
@@ -154,20 +152,32 @@ async def create_workflow(
 
 
 @mcp.tool()
-async def create_workflow_from_json(workflow_json: str) -> str:
+async def create_workflow_from_json(workflow_json: str | dict) -> str:
     """
-    Create a workflow from a JSON string (useful for importing/cloning).
+    Create a workflow from a JSON string or dict (useful for importing/cloning).
 
     Args:
-        workflow_json: Complete workflow definition as JSON string
+        workflow_json: Complete workflow definition as JSON string or dict
 
     Returns:
         JSON string with created workflow details
     """
-    try:
-        workflow_data = json.loads(workflow_json)
-    except json.JSONDecodeError as e:
-        return json.dumps({"error": f"Invalid JSON: {e}"})
+    # Handle both string and dict input
+    if isinstance(workflow_json, dict):
+        workflow_data = workflow_json
+    elif isinstance(workflow_json, str):
+        try:
+            workflow_data = json.loads(workflow_json)
+        except json.JSONDecodeError as e:
+            return json.dumps({"error": f"Invalid JSON: {e}"})
+    else:
+        return json.dumps({"error": "workflow_json must be a string or dict"})
+
+    # Clean the workflow data - remove read-only fields
+    workflow_data.pop("id", None)
+    workflow_data.pop("active", None)
+    workflow_data.pop("tags", None)
+    workflow_data.pop("versionId", None)
 
     async with httpx.AsyncClient(
         base_url=N8N_API_URL,
@@ -188,7 +198,7 @@ async def update_workflow(
     nodes: Optional[list] = None,
     connections: Optional[dict] = None,
     settings: Optional[dict] = None,
-    tags: Optional[list[str]] = None
+    active: Optional[bool] = None
 ) -> str:
     """
     Update a workflow. Only provide the fields you want to change (partial update).
@@ -199,7 +209,7 @@ async def update_workflow(
         nodes: Updated node list (replaces all nodes)
         connections: Updated connections (replaces all connections)
         settings: Updated settings (merges with existing)
-        tags: Updated tag list
+        active: Set active status (true/false)
 
     Returns:
         JSON string with updated workflow details
@@ -239,16 +249,18 @@ async def update_workflow(
         else:
             update_data["settings"] = current.get("settings", {})
 
-        if tags is not None:
-            update_data["tags"] = tags
+        # Handle active parameter
+        if active is not None:
+            update_data["active"] = active
         else:
-            update_data["tags"] = current.get("tags", [])
+            update_data["active"] = current.get("active", False)
 
-        update_data["active"] = current.get("active", False)
+        update_data["tags"] = current.get("tags", [])
         update_data["versionId"] = current.get("versionId")
         update_data["staticData"] = current.get("staticData", None)
 
-        response = await client.patch(f"/workflows/{workflow_id}", json=update_data)
+        # Use PUT instead of PATCH (PATCH not supported in this n8n version)
+        response = await client.put(f"/workflows/{workflow_id}", json=update_data)
         handle_api_error(response)
         return format_response(response.json())
 
@@ -889,14 +901,12 @@ async def clone_workflow(
         handle_api_error(get_response)
         source = get_response.json()
 
-        # Create a copy with new name (remove id to create new)
-        # Note: 'active' field is read-only when creating, so we don't include it
+        # Create a copy with new name (remove id, active, and tags as they're read-only)
         workflow_data = {
             "name": new_name,
             "nodes": source.get("nodes", []),
             "connections": source.get("connections", {}),
             "settings": source.get("settings", {}),
-            "tags": source.get("tags", []),
             "staticData": source.get("staticData", None)
         }
 
@@ -950,7 +960,14 @@ async def activate_workflow(workflow_id: str) -> str:
         headers={"X-N8N-API-KEY": N8N_API_KEY},
         timeout=30.0
     ) as client:
-        response = await client.patch(f"/workflows/{workflow_id}", json={"active": True})
+        # First get the workflow to get its current state
+        get_response = await client.get(f"/workflows/{workflow_id}")
+        handle_api_error(get_response)
+        workflow = get_response.json()
+
+        # Update with active=True using PUT
+        workflow["active"] = True
+        response = await client.put(f"/workflows/{workflow_id}", json=workflow)
         handle_api_error(response)
         return format_response(response.json())
 
@@ -963,7 +980,14 @@ async def deactivate_workflow(workflow_id: str) -> str:
         headers={"X-N8N-API-KEY": N8N_API_KEY},
         timeout=30.0
     ) as client:
-        response = await client.patch(f"/workflows/{workflow_id}", json={"active": False})
+        # First get the workflow to get its current state
+        get_response = await client.get(f"/workflows/{workflow_id}")
+        handle_api_error(get_response)
+        workflow = get_response.json()
+
+        # Update with active=False using PUT
+        workflow["active"] = False
+        response = await client.put(f"/workflows/{workflow_id}", json=workflow)
         handle_api_error(response)
         return format_response(response.json())
 
@@ -1071,6 +1095,290 @@ async def retry_execution(execution_id: str) -> str:
         response = await client.post(f"/executions/{execution_id}/retry")
         handle_api_error(response)
         return format_response(response.json())
+
+
+# ==================== DEBUGGING TOOLS ====================
+
+@mcp.tool()
+async def test_workflow(
+    workflow_id: str,
+    data: Optional[dict] = None,
+    start_nodes: Optional[list[str]] = None
+) -> str:
+    """
+    Test/execute a workflow in "manual execution" mode for debugging.
+    This executes the workflow and returns detailed execution data.
+
+    Args:
+        workflow_id: ID of the workflow to test
+        data: Test data to send to the workflow
+        start_nodes: Optional nodes to start from (for partial testing)
+
+    Returns:
+        JSON string with execution details including status, runtime, and results
+    """
+    execution_data = {}
+    if data is not None:
+        execution_data["data"] = data
+    if start_nodes:
+        execution_data["startNodes"] = start_nodes
+
+    async with httpx.AsyncClient(
+        base_url=N8N_API_URL,
+        headers={"X-N8N-API-KEY": N8N_API_KEY},
+        timeout=60.0  # Longer timeout for testing
+    ) as client:
+        response = await client.post(f"/workflows/{workflow_id}/execute", json=execution_data)
+        handle_api_error(response)
+        return format_response(response.json())
+
+
+@mcp.tool()
+async def debug_execution(execution_id: str) -> str:
+    """
+    Get detailed debugging information about an execution.
+    Includes node-by-node execution data, errors, and output.
+
+    Args:
+        execution_id: ID of the execution to debug
+
+    Returns:
+        JSON string with detailed execution debug info
+    """
+    async with httpx.AsyncClient(
+        base_url=N8N_API_URL,
+        headers={"X-N8N-API-KEY": N8N_API_KEY},
+        timeout=30.0
+    ) as client:
+        response = await client.get(f"/executions/{execution_id}")
+        handle_api_error(response)
+        execution = response.json()
+
+        # Format debug information
+        debug_info = {
+            "execution_id": execution.get("id"),
+            "workflow_id": execution.get("workflowId"),
+            "status": execution.get("status"),
+            "mode": execution.get("mode"),
+            "started_at": execution.get("startedAt"),
+            "stopped_at": execution.get("stoppedAt"),
+            "runtime_ms": execution.get("finishedAt") and execution.get("waitTill"),
+            "data": execution.get("data"),
+            "result_data": execution.get("resultData"),
+            "error": execution.get("error"),
+            "execution_data": execution.get("executionData")
+        }
+
+        return format_response(debug_info)
+
+
+@mcp.tool()
+async def get_execution_logs(execution_id: str) -> str:
+    """
+    Get detailed logs for a specific execution including node execution order.
+
+    Args:
+        execution_id: ID of the execution
+
+    Returns:
+        JSON string with execution logs and timeline
+    """
+    async with httpx.AsyncClient(
+        base_url=N8N_API_URL,
+        headers={"X-N8N-API-KEY": N8N_API_KEY},
+        timeout=30.0
+    ) as client:
+        response = await client.get(f"/executions/{execution_id}")
+        handle_api_error(response)
+        execution = response.json()
+
+        logs = {
+            "execution_id": execution.get("id"),
+            "workflow_id": execution.get("workflowId"),
+            "status": execution.get("status"),
+            "started_at": execution.get("startedAt"),
+            "stopped_at": execution.get("stoppedAt"),
+            "nodes_execution": execution.get("executionData", {}).get("contextData", {}).get("nodeExecutionStack", []),
+            "result_data": execution.get("resultData", {}),
+            "workflow_data": execution.get("data", {})
+        }
+
+        return format_response(logs)
+
+
+@mcp.tool()
+async def get_workflow_executions(
+    workflow_id: str,
+    limit: int = 10,
+    status: Optional[str] = None
+) -> str:
+    """
+    Get all executions for a specific workflow, ordered by most recent.
+
+    Args:
+        workflow_id: ID of the workflow
+        limit: Maximum number of executions to return
+        status: Optional filter by status (error, success, waiting, running)
+
+    Returns:
+        JSON string with workflow execution history
+    """
+    params = {"workflowId": workflow_id, "limit": limit}
+    if status:
+        params["status"] = status
+
+    async with httpx.AsyncClient(
+        base_url=N8N_API_URL,
+        headers={"X-N8N-API-KEY": N8N_API_KEY},
+        timeout=30.0
+    ) as client:
+        response = await client.get("/executions", params=params)
+        handle_api_error(response)
+
+        executions = response.json().get("data", [])
+
+        # Format execution summary
+        summary = {
+            "workflow_id": workflow_id,
+            "total_executions": len(executions),
+            "executions": [
+                {
+                    "id": ex.get("id"),
+                    "status": ex.get("status"),
+                    "started_at": ex.get("startedAt"),
+                    "finished_at": ex.get("finishedAt"),
+                    "mode": ex.get("mode"),
+                    "retry_of": ex.get("retryOf"),
+                    "retry_success_id": ex.get("retrySuccessId")
+                }
+                for ex in executions
+            ]
+        }
+
+        return format_response(summary)
+
+
+@mcp.tool()
+async def get_failed_executions(workflow_id: Optional[str] = None, limit: int = 20) -> str:
+    """
+    Get only failed executions for debugging.
+
+    Args:
+        workflow_id: Optional workflow ID to filter by
+        limit: Maximum number of failed executions to return
+
+    Returns:
+        JSON string with failed executions and error details
+    """
+    params = {"status": "error", "limit": limit}
+    if workflow_id:
+        params["workflowId"] = workflow_id
+
+    async with httpx.AsyncClient(
+        base_url=N8N_API_URL,
+        headers={"X-N8N-API-KEY": N8N_API_KEY},
+        timeout=30.0
+    ) as client:
+        response = await client.get("/executions", params=params)
+        handle_api_error(response)
+
+        executions = response.json().get("data", [])
+
+        # Format error summary
+        errors = []
+        for ex in executions:
+            error_info = {
+                "execution_id": ex.get("id"),
+                "workflow_id": ex.get("workflowId"),
+                "started_at": ex.get("startedAt"),
+                "error": ex.get("error"),
+                "last_node_executed": ex.get("executionData", {}).get("lastNodeExecuted")
+            }
+            errors.append(error_info)
+
+        return format_response({
+            "total_failed": len(errors),
+            "errors": errors
+        })
+
+
+@mcp.tool()
+async def get_execution_result(execution_id: str) -> str:
+    """
+    Get the final result/output data from an execution.
+
+    Args:
+        execution_id: ID of the execution
+
+    Returns:
+        JSON string with execution result data
+    """
+    async with httpx.AsyncClient(
+        base_url=N8N_API_URL,
+        headers={"X-N8N-API-KEY": N8N_API_KEY},
+        timeout=30.0
+    ) as client:
+        response = await client.get(f"/executions/{execution_id}")
+        handle_api_error(response)
+        execution = response.json()
+
+        return format_response({
+            "execution_id": execution.get("id"),
+            "status": execution.get("status"),
+            "result_data": execution.get("resultData", {}),
+            "workflow_output": execution.get("data"),
+            "error": execution.get("error")
+        })
+
+
+@mcp.tool()
+async def wait_for_execution(
+    execution_id: str,
+    timeout: int = 60
+) -> str:
+    """
+    Wait for an execution to complete and return the final result.
+    Useful for testing synchronous workflows.
+
+    Args:
+        execution_id: ID of the execution to wait for
+        timeout: Maximum seconds to wait (default: 60)
+
+    Returns:
+        JSON string with final execution status and results
+    """
+    import asyncio
+
+    start_time = asyncio.get_event_loop().time()
+    poll_interval = 1  # Check every second
+
+    while (asyncio.get_event_loop().time() - start_time) < timeout:
+        async with httpx.AsyncClient(
+            base_url=N8N_API_URL,
+            headers={"X-N8N-API-KEY": N8N_API_KEY},
+            timeout=30.0
+        ) as client:
+            response = await client.get(f"/executions/{execution_id}")
+            handle_api_error(response)
+            execution = response.json()
+
+            status = execution.get("status")
+            if status in ["success", "error", "crashed"]:
+                return format_response({
+                    "execution_id": execution.get("id"),
+                    "status": status,
+                    "result_data": execution.get("resultData", {}),
+                    "error": execution.get("error"),
+                    "waited_seconds": round(asyncio.get_event_loop().time() - start_time)
+                })
+
+        await asyncio.sleep(poll_interval)
+
+    return format_response({
+        "error": "Timeout waiting for execution to complete",
+        "execution_id": execution_id,
+        "last_status": execution.get("status")
+    })
 
 
 # ==================== MANUAL EXECUTION ====================

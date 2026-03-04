@@ -26,8 +26,7 @@ SERVER_HOST = os.getenv("N8N_MCP_HOST", "localhost")
 
 if not N8N_API_KEY:
     raise ValueError(
-        "N8N_API_KEY environment variable is required. "
-        "Set it with your n8n API key."
+        "N8N_API_KEY environment variable is required. Set it with your n8n API key."
     )
 
 
@@ -39,11 +38,16 @@ def format_response(data: Any) -> str:
 def handle_api_error(response: httpx.Response) -> None:
     """Handle API error responses."""
     if response.status_code >= 400:
-        error_data = response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text
+        error_data = (
+            response.json()
+            if response.headers.get("content-type", "").startswith("application/json")
+            else response.text
+        )
         raise Exception(f"n8n API error ({response.status_code}): {error_data}")
 
 
 # ==================== WORKFLOWS ====================
+
 
 @app.list_tools()
 async def list_tools() -> list[Tool]:
@@ -55,10 +59,16 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "limit": {"type": "number", "description": "Maximum number of workflows to return (default: 20)"},
-                    "offset": {"type": "number", "description": "Number of workflows to skip (default: 0)"}
-                }
-            }
+                    "limit": {
+                        "type": "number",
+                        "description": "Maximum number of workflows to return (default: 20)",
+                    },
+                    "offset": {
+                        "type": "number",
+                        "description": "Number of workflows to skip (default: 0)",
+                    },
+                },
+            },
         ),
         Tool(
             name="get_workflow",
@@ -66,10 +76,13 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "workflow_id": {"type": "string", "description": "The ID of the workflow to retrieve"}
+                    "workflow_id": {
+                        "type": "string",
+                        "description": "The ID of the workflow to retrieve",
+                    }
                 },
-                "required": ["workflow_id"]
-            }
+                "required": ["workflow_id"],
+            },
         ),
         Tool(
             name="get_workflow_by_name",
@@ -77,10 +90,13 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string", "description": "The name of the workflow to retrieve"}
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the workflow to retrieve",
+                    }
                 },
-                "required": ["name"]
-            }
+                "required": ["name"],
+            },
         ),
         Tool(
             name="create_workflow",
@@ -90,11 +106,17 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "name": {"type": "string", "description": "Name of the workflow"},
                     "nodes": {"type": "array", "description": "List of node objects"},
-                    "connections": {"type": "object", "description": "Connection definitions between nodes"},
-                    "settings": {"type": "object", "description": "Optional workflow settings"}
+                    "connections": {
+                        "type": "object",
+                        "description": "Connection definitions between nodes",
+                    },
+                    "settings": {
+                        "type": "object",
+                        "description": "Optional workflow settings",
+                    },
                 },
-                "required": ["name", "nodes", "connections"]
-            }
+                "required": ["name", "nodes", "connections"],
+            },
         ),
         Tool(
             name="activate_workflow",
@@ -102,10 +124,13 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "workflow_id": {"type": "string", "description": "ID of the workflow to activate"}
+                    "workflow_id": {
+                        "type": "string",
+                        "description": "ID of the workflow to activate",
+                    }
                 },
-                "required": ["workflow_id"]
-            }
+                "required": ["workflow_id"],
+            },
         ),
         Tool(
             name="deactivate_workflow",
@@ -113,10 +138,13 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "workflow_id": {"type": "string", "description": "ID of the workflow to deactivate"}
+                    "workflow_id": {
+                        "type": "string",
+                        "description": "ID of the workflow to deactivate",
+                    }
                 },
-                "required": ["workflow_id"]
-            }
+                "required": ["workflow_id"],
+            },
         ),
         Tool(
             name="delete_workflow",
@@ -124,10 +152,13 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "workflow_id": {"type": "string", "description": "ID of the workflow to delete"}
+                    "workflow_id": {
+                        "type": "string",
+                        "description": "ID of the workflow to delete",
+                    }
                 },
-                "required": ["workflow_id"]
-            }
+                "required": ["workflow_id"],
+            },
         ),
         Tool(
             name="list_executions",
@@ -137,21 +168,25 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "limit": {"type": "number"},
                     "offset": {"type": "number"},
-                    "workflow_id": {"type": "string", "description": "Filter by workflow ID"},
-                    "status": {"type": "string", "description": "Filter by status (error, success, waiting, running)"}
-                }
-            }
+                    "workflow_id": {
+                        "type": "string",
+                        "description": "Filter by workflow ID",
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Filter by status (error, success, waiting, running)",
+                    },
+                },
+            },
         ),
         Tool(
             name="get_execution",
             description="Get details of a specific execution",
             inputSchema={
                 "type": "object",
-                "properties": {
-                    "execution_id": {"type": "string"}
-                },
-                "required": ["execution_id"]
-            }
+                "properties": {"execution_id": {"type": "string"}},
+                "required": ["execution_id"],
+            },
         ),
         Tool(
             name="execute_workflow",
@@ -160,10 +195,13 @@ async def list_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "workflow_id": {"type": "string"},
-                    "data": {"type": "object", "description": "Input data for the workflow"}
+                    "data": {
+                        "type": "object",
+                        "description": "Input data for the workflow",
+                    },
                 },
-                "required": ["workflow_id"]
-            }
+                "required": ["workflow_id"],
+            },
         ),
         Tool(
             name="execute_workflow_by_name",
@@ -172,31 +210,32 @@ async def list_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "name": {"type": "string"},
-                    "data": {"type": "object", "description": "Input data for the workflow"}
+                    "data": {
+                        "type": "object",
+                        "description": "Input data for the workflow",
+                    },
                 },
-                "required": ["name"]
-            }
+                "required": ["name"],
+            },
         ),
         Tool(
             name="list_webhooks",
             description="List all webhook paths in the n8n instance",
-            inputSchema={"type": "object", "properties": {}}
+            inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="get_webhook_url",
             description="Get the webhook URL for a specific workflow",
             inputSchema={
                 "type": "object",
-                "properties": {
-                    "workflow_id": {"type": "string"}
-                },
-                "required": ["workflow_id"]
-            }
+                "properties": {"workflow_id": {"type": "string"}},
+                "required": ["workflow_id"],
+            },
         ),
         Tool(
             name="list_tags",
             description="List all tags in the n8n instance",
-            inputSchema={"type": "object", "properties": {}}
+            inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="create_tag",
@@ -205,15 +244,18 @@ async def list_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "name": {"type": "string"},
-                    "color": {"type": "string", "description": "Optional color for the tag (hex format)"}
+                    "color": {
+                        "type": "string",
+                        "description": "Optional color for the tag (hex format)",
+                    },
                 },
-                "required": ["name"]
-            }
+                "required": ["name"],
+            },
         ),
         Tool(
             name="get_server_info",
             description="Get information about the n8n server instance",
-            inputSchema={"type": "object", "properties": {}}
+            inputSchema={"type": "object", "properties": {}},
         ),
     ]
 
@@ -224,9 +266,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
     async def make_request(method: str, path: str, **kwargs) -> httpx.Response:
         async with httpx.AsyncClient(
-            base_url=N8N_API_URL,
-            headers={"X-N8N-API-KEY": N8N_API_KEY},
-            timeout=30.0
+            base_url=N8N_API_URL, headers={"X-N8N-API-KEY": N8N_API_KEY}, timeout=30.0
         ) as client:
             if method == "GET":
                 return await client.get(path, **kwargs)
@@ -246,7 +286,9 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = format_response(response.json())
 
         elif name == "get_workflow":
-            response = await make_request("GET", f"/workflows/{arguments['workflow_id']}")
+            response = await make_request(
+                "GET", f"/workflows/{arguments['workflow_id']}"
+            )
             handle_api_error(response)
             result = format_response(response.json())
 
@@ -259,7 +301,9 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     result = format_response(workflow)
                     break
             else:
-                result = json.dumps({"error": f"Workflow '{arguments['name']}' not found"})
+                result = json.dumps(
+                    {"error": f"Workflow '{arguments['name']}' not found"}
+                )
 
         elif name == "create_workflow":
             workflow_data = {
@@ -267,26 +311,39 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 "nodes": arguments.get("nodes", []),
                 "connections": arguments.get("connections", {}),
                 "settings": arguments.get("settings", {}),
-                "active": False
+                "active": False,
             }
             response = await make_request("POST", "/workflows", json=workflow_data)
             handle_api_error(response)
             result = format_response(response.json())
 
         elif name == "activate_workflow":
-            response = await make_request("PATCH", f"/workflows/{arguments['workflow_id']}", json={"active": True})
+            response = await make_request(
+                "PATCH", f"/workflows/{arguments['workflow_id']}", json={"active": True}
+            )
             handle_api_error(response)
             result = format_response(response.json())
 
         elif name == "deactivate_workflow":
-            response = await make_request("PATCH", f"/workflows/{arguments['workflow_id']}", json={"active": False})
+            response = await make_request(
+                "PATCH",
+                f"/workflows/{arguments['workflow_id']}",
+                json={"active": False},
+            )
             handle_api_error(response)
             result = format_response(response.json())
 
         elif name == "delete_workflow":
-            response = await make_request("DELETE", f"/workflows/{arguments['workflow_id']}")
+            response = await make_request(
+                "DELETE", f"/workflows/{arguments['workflow_id']}"
+            )
             handle_api_error(response)
-            result = format_response({"success": True, "message": f"Workflow {arguments['workflow_id']} deleted"})
+            result = format_response(
+                {
+                    "success": True,
+                    "message": f"Workflow {arguments['workflow_id']} deleted",
+                }
+            )
 
         elif name == "list_executions":
             params = {k: v for k, v in arguments.items() if v is not None}
@@ -295,7 +352,9 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = format_response(response.json())
 
         elif name == "get_execution":
-            response = await make_request("GET", f"/executions/{arguments['execution_id']}")
+            response = await make_request(
+                "GET", f"/executions/{arguments['execution_id']}"
+            )
             handle_api_error(response)
             result = format_response(response.json())
 
@@ -303,7 +362,11 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             execution_data = {}
             if "data" in arguments:
                 execution_data["data"] = arguments["data"]
-            response = await make_request("POST", f"/workflows/{arguments['workflow_id']}/execute", json=execution_data)
+            response = await make_request(
+                "POST",
+                f"/workflows/{arguments['workflow_id']}/execute",
+                json=execution_data,
+            )
             handle_api_error(response)
             result = format_response(response.json())
 
@@ -319,12 +382,16 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     break
 
             if not workflow_id:
-                result = json.dumps({"error": f"Workflow '{arguments['name']}' not found"})
+                result = json.dumps(
+                    {"error": f"Workflow '{arguments['name']}' not found"}
+                )
             else:
                 execution_data = {}
                 if "data" in arguments:
                     execution_data["data"] = arguments["data"]
-                response = await make_request("POST", f"/workflows/{workflow_id}/execute", json=execution_data)
+                response = await make_request(
+                    "POST", f"/workflows/{workflow_id}/execute", json=execution_data
+                )
                 handle_api_error(response)
                 result = format_response(response.json())
 
@@ -334,7 +401,9 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = format_response(response.json())
 
         elif name == "get_webhook_url":
-            response = await make_request("GET", f"/webhooks/workflow/{arguments['workflow_id']}")
+            response = await make_request(
+                "GET", f"/webhooks/workflow/{arguments['workflow_id']}"
+            )
             handle_api_error(response)
             result = format_response(response.json())
 
@@ -355,11 +424,13 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             base_url = N8N_API_URL.replace("/api/v1", "")
             response = await make_request("GET", "/active-workflows")
             handle_api_error(response)
-            result = format_response({
-                "api_url": N8N_API_URL,
-                "base_url": base_url,
-                "active_workflows": response.json()
-            })
+            result = format_response(
+                {
+                    "api_url": N8N_API_URL,
+                    "base_url": base_url,
+                    "active_workflows": response.json(),
+                }
+            )
 
         else:
             result = json.dumps({"error": f"Unknown tool: {name}"})
@@ -371,6 +442,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
 
 # ==================== MAIN ====================
+
 
 def main():
     """Start the HTTP MCP server and display connection info."""
@@ -398,10 +470,22 @@ def main():
     print("Starting server on", f"{SERVER_HOST}:{SERVER_PORT}")
     print("Available tools:")
     tools = [
-        "list_workflows", "get_workflow", "get_workflow_by_name", "create_workflow",
-        "activate_workflow", "deactivate_workflow", "delete_workflow", "list_executions",
-        "get_execution", "execute_workflow", "execute_workflow_by_name", "list_webhooks",
-        "get_webhook_url", "list_tags", "create_tag", "get_server_info"
+        "list_workflows",
+        "get_workflow",
+        "get_workflow_by_name",
+        "create_workflow",
+        "activate_workflow",
+        "deactivate_workflow",
+        "delete_workflow",
+        "list_executions",
+        "get_execution",
+        "execute_workflow",
+        "execute_workflow_by_name",
+        "list_webhooks",
+        "get_webhook_url",
+        "list_tags",
+        "create_tag",
+        "get_server_info",
     ]
     for tool in tools:
         print(f"   - {tool}")
@@ -420,7 +504,11 @@ def main():
     starlette_app = Starlette(
         routes=[
             Route("/sse", endpoint=app.create_sse_endpoint(transport)),
-            Route("/messages", endpoint=app.create_post_endpoint(transport), methods=["POST"])
+            Route(
+                "/messages",
+                endpoint=app.create_post_endpoint(transport),
+                methods=["POST"],
+            ),
         ]
     )
 

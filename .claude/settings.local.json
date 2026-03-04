@@ -11,7 +11,17 @@
       "mcp__n8n-mcp__list_workflows",
       "mcp__n8n__get_workflow",
       "mcp__n8n__clone_workflow",
-      "mcp__n8n__create_workflow_from_json"
+      "mcp__n8n__create_workflow_from_json",
+      "mcp__web-reader__webReader",
+      "mcp__n8n-mcp__create_workflow",
+      "mcp__n8n-mcp__create_workflow_from_json",
+      "mcp__n8n-mcp__get_workflow_by_name",
+      "Bash(echo {\"name\": \"Tripbot MCP Chat\", \"nodes\": [], \"connections\": {}, \"settings\": {\"executionOrder\": \"v1\"}}:*)",
+      "mcp__n8n-mcp__add_code_node",
+      "mcp__n8n-mcp__add_node_to_workflow",
+      "mcp__n8n-mcp__update_workflow",
+      "mcp__n8n-mcp__get_webhook_url",
+      "mcp__n8n-mcp__list_webhooks"
     ]
   }
 }
