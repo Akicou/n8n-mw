@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo:*)",
+      "Bash(ls:*)",
+      "Bash(true:*)",
+      "Bash(cd C:\\\\Users\\\\lyani\\\\ClaudeProjects\\\\n8n-mw:*)",
+      "Bash(curl:*)",
+      "mcp__n8n-mcp__get_workflow",
+      "mcp__n8n-mcp__get_server_info",
+      "mcp__n8n-mcp__list_workflows",
+      "mcp__n8n__get_workflow",
+      "mcp__n8n__clone_workflow",
+      "mcp__n8n__create_workflow_from_json"
+    ]
+  }
+}
