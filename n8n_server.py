@@ -354,6 +354,514 @@ async def remove_node_from_workflow(
         return await update_workflow(workflow_id, nodes=nodes)
 
 
+# ==================== NODE CREATION HELPERS ====================
+
+@mcp.tool()
+async def add_http_request_node(
+    workflow_id: str,
+    node_id: str,
+    name: str,
+    url: str,
+    method: str = "GET",
+    headers: Optional[dict] = None,
+    body: Optional[dict] = None,
+    position: Optional[list[int]] = None
+) -> str:
+    """
+    Add an HTTP Request node to a workflow.
+
+    Args:
+        workflow_id: ID of the workflow
+        node_id: Unique ID for the node
+        name: Display name for the node
+        url: The URL to send the request to
+        method: HTTP method (GET, POST, PUT, DELETE, PATCH)
+        headers: Optional headers dictionary
+        body: Optional JSON body for POST/PUT/PATCH
+        position: Optional [x, y] position (default: [250, 300])
+
+    Returns:
+        JSON string with updated workflow
+    """
+    node = {
+        "id": node_id,
+        "name": name,
+        "type": "n8n-nodes-base.httpRequest",
+        "position": position or [250, 300],
+        "parameters": {
+            "method": method,
+            "url": url
+        }
+    }
+
+    if headers:
+        node["parameters"]["headerParameters"] = {
+            "parameters": [
+                {"name": k, "value": v}
+                for k, v in headers.items()
+            ]
+        }
+
+    if body and method in ["POST", "PUT", "PATCH"]:
+        node["parameters"]["bodyParameters"] = {
+            "parameters": [
+                {"name": k, "value": v}
+                for k, v in body.items()
+            ]
+        }
+
+    return await add_node_to_workflow(workflow_id, node)
+
+
+@mcp.tool()
+async def add_code_node(
+    workflow_id: str,
+    node_id: str,
+    name: str,
+    code: str,
+    language: str = "javaScript",
+    position: Optional[list[int]] = None
+) -> str:
+    """
+    Add a Code node to execute JavaScript/Python code.
+
+    Args:
+        workflow_id: ID of the workflow
+        node_id: Unique ID for the node
+        name: Display name for the node
+        code: The code to execute
+        language: Programming language (javaScript or python)
+        position: Optional [x, y] position
+
+    Returns:
+        JSON string with updated workflow
+    """
+    node = {
+        "id": node_id,
+        "name": name,
+        "type": "n8n-nodes-base.code",
+        "position": position or [250, 300],
+        "parameters": {
+            "language": language,
+            "code": code
+        }
+    }
+
+    return await add_node_to_workflow(workflow_id, node)
+
+
+@mcp.tool()
+async def add_webhook_node(
+    workflow_id: str,
+    node_id: str,
+    name: str,
+    path: str,
+    http_method: str = "POST",
+    response_mode: str = "responseNode",
+    position: Optional[list[int]] = None
+) -> str:
+    """
+    Add a Webhook node to trigger workflows via HTTP.
+
+    Args:
+        workflow_id: ID of the workflow
+        node_id: Unique ID for the node
+        name: Display name for the node
+        path: The webhook path (e.g., "my-webhook")
+        http_method: HTTP method (GET, POST, PUT, DELETE)
+        response_mode: How to respond (onReceived, responseNode, lastNode)
+        position: Optional [x, y] position
+
+    Returns:
+        JSON string with updated workflow
+    """
+    node = {
+        "id": node_id,
+        "name": name,
+        "type": "n8n-nodes-base.webhook",
+        "position": position or [250, 300],
+        "parameters": {
+            "path": path,
+            "httpMethod": http_method,
+            "responseMode": response_mode
+        }
+    }
+
+    return await add_node_to_workflow(workflow_id, node)
+
+
+@mcp.tool()
+async def add_set_node(
+    workflow_id: str,
+    node_id: str,
+    name: str,
+    values: dict,
+    position: Optional[list[int]] = None
+) -> str:
+    """
+    Add a Set node to define/merge data values.
+
+    Args:
+        workflow_id: ID of the workflow
+        node_id: Unique ID for the node
+        name: Display name for the node
+        values: Dictionary of key-value pairs to set
+        position: Optional [x, y] position
+
+    Returns:
+        JSON string with updated workflow
+    """
+    parameters = []
+    for i, (key, value) in enumerate(values.items()):
+        parameters.append({
+            "name": key,
+            "value": value,
+            "number": i
+        })
+
+    node = {
+        "id": node_id,
+        "name": name,
+        "type": "n8n-nodes-base.set",
+        "position": position or [250, 300],
+        "parameters": {
+            "assignments": {
+                "assignments": parameters
+            }
+        }
+    }
+
+    return await add_node_to_workflow(workflow_id, node)
+
+
+@mcp.tool()
+async def add_if_node(
+    workflow_id: str,
+    node_id: str,
+    name: str,
+    condition: str,
+    position: Optional[list[int]] = None
+) -> str:
+    """
+    Add an IF node to split workflow based on conditions.
+
+    Args:
+        workflow_id: ID of the workflow
+        node_id: Unique ID for the node
+        name: Display name for the node
+        condition: JavaScript expression (e.g., "{{ $json.status }} === 'success'")
+        position: Optional [x, y] position
+
+    Returns:
+        JSON string with updated workflow
+    """
+    node = {
+        "id": node_id,
+        "name": name,
+        "type": "n8n-nodes-base.if",
+        "position": position or [250, 300],
+        "parameters": {
+            "conditions": {
+                "string": [
+                    {
+                        "number": 1,
+                        "value": condition,
+                        "output": 0
+                    }
+                ]
+            }
+        }
+    }
+
+    return await add_node_to_workflow(workflow_id, node)
+
+
+@mcp.tool()
+async def add_merge_node(
+    workflow_id: str,
+    node_id: str,
+    name: str,
+    mode: str = "combine",
+    position: Optional[list[int]] = None
+) -> str:
+    """
+    Add a Merge node to combine/merge data from multiple inputs.
+
+    Args:
+        workflow_id: ID of the workflow
+        node_id: Unique ID for the node
+        name: Display name for the node
+        mode: Merge mode (combine, append, merge, multiplex)
+        position: Optional [x, y] position
+
+    Returns:
+        JSON string with updated workflow
+    """
+    node = {
+        "id": node_id,
+        "name": name,
+        "type": "n8n-nodes-base.merge",
+        "position": position or [250, 300],
+        "parameters": {
+            "mode": mode
+        }
+    }
+
+    return await add_node_to_workflow(workflow_id, node)
+
+
+@mcp.tool()
+async def add_switch_node(
+    workflow_id: str,
+    node_id: str,
+    name: str,
+    rules: list[dict],
+    position: Optional[list[int]] = None
+) -> str:
+    """
+    Add a Switch node to route data based on multiple conditions.
+
+    Args:
+        workflow_id: ID of the workflow
+        node_id: Unique ID for the node
+        name: Display name for the node
+        rules: List of rule dicts with 'name' and 'condition' keys
+        position: Optional [x, y] position
+
+    Example rules:
+    [
+        {"name": "High Priority", "condition": "{{ $json.priority }} > 5"},
+        {"name": "Low Priority", "condition": "{{ $json.priority }} <= 5"}
+    ]
+
+    Returns:
+        JSON string with updated workflow
+    """
+    rules_data = []
+    for i, rule in enumerate(rules):
+        rules_data.append({
+            "name": rule.get("name", f"Rule {i+1}"),
+            "conditions": {
+                "string": [
+                    {
+                        "number": 1,
+                        "value": rule.get("condition", ""),
+                        "output": i
+                    }
+                ]
+            }
+        })
+
+    node = {
+        "id": node_id,
+        "name": name,
+        "type": "n8n-nodes-base.switch",
+        "position": position or [250, 300],
+        "parameters": {
+            "rules": {
+                "values": rules_data
+            }
+        }
+    }
+
+    return await add_node_to_workflow(workflow_id, node)
+
+
+@mcp.tool()
+async def add_loop_node(
+    workflow_id: str,
+    node_id: str,
+    name: str,
+    loop_over: str = "items",
+    position: Optional[list[int]] = None
+) -> str:
+    """
+    Add a Loop Over Items node to iterate over arrays.
+
+    Args:
+        workflow_id: ID of the workflow
+        node_id: Unique ID for the node
+        name: Display name for the node
+        loop_over: Field to loop over (default: "items")
+        position: Optional [x, y] position
+
+    Returns:
+        JSON string with updated workflow
+    """
+    node = {
+        "id": node_id,
+        "name": name,
+        "type": "n8n-nodes-base.splitInBatches",
+        "position": position or [250, 300],
+        "parameters": {
+            "fieldToLoopOver": loop_over,
+            "options": {}
+        }
+    }
+
+    return await add_node_to_workflow(workflow_id, node)
+
+
+@mcp.tool()
+async def add_wait_node(
+    workflow_id: str,
+    node_id: str,
+    name: str,
+    wait_time: int = 1,
+    unit: str = "seconds",
+    position: Optional[list[int]] = None
+) -> str:
+    """
+    Add a Wait node to pause execution.
+
+    Args:
+        workflow_id: ID of the workflow
+        node_id: Unique ID for the node
+        name: Display name for the node
+        wait_time: Amount of time to wait
+        unit: Time unit (seconds, minutes, hours)
+        position: Optional [x, y] position
+
+    Returns:
+        JSON string with updated workflow
+    """
+    node = {
+        "id": node_id,
+        "name": name,
+        "type": "n8n-nodes-base.wait",
+        "position": position or [250, 300],
+        "parameters": {
+            "amount": wait_time,
+            "unit": unit
+        }
+    }
+
+    return await add_node_to_workflow(workflow_id, node)
+
+
+@mcp.tool()
+async def add_note_node(
+    workflow_id: str,
+    node_id: str,
+    name: str,
+    content: str,
+    position: Optional[list[int]] = None
+) -> str:
+    """
+    Add a sticky note to document the workflow.
+
+    Args:
+        workflow_id: ID of the workflow
+        node_id: Unique ID for the node
+        name: Display name for the note
+        content: The note content/text
+        position: Optional [x, y] position
+
+    Returns:
+        JSON string with updated workflow
+    """
+    node = {
+        "id": node_id,
+        "name": name,
+        "type": "n8n-nodes-base.stickyNote",
+        "position": position or [250, 300],
+        "parameters": {
+            "content": content,
+            "height": 200,
+            "width": 200
+        }
+    }
+
+    return await add_node_to_workflow(workflow_id, node)
+
+
+@mcp.tool()
+async def connect_nodes(
+    workflow_id: str,
+    source_node_id: str,
+    target_node_id: str,
+    source_output_index: int = 0,
+    target_input_index: int = 0
+) -> str:
+    """
+    Connect two nodes in a workflow.
+
+    Args:
+        workflow_id: ID of the workflow
+        source_node_id: ID of the source node
+        target_node_id: ID of the target node
+        source_output_index: Output index on source (default: 0)
+        target_input_index: Input index on target (default: 0)
+
+    Returns:
+        JSON string with updated workflow
+    """
+    async with httpx.AsyncClient(
+        base_url=N8N_API_URL,
+        headers={"X-N8N-API-KEY": N8N_API_KEY},
+        timeout=30.0
+    ) as client:
+        get_response = await client.get(f"/workflows/{workflow_id}")
+        handle_api_error(get_response)
+        current = get_response.json()
+
+        connections = current.get("connections", {})
+
+        # Initialize connections structure for source node if not exists
+        if source_node_id not in connections:
+            connections[source_node_id] = {"main": [[], []]}
+
+        # Add the connection
+        connections[source_node_id]["main"][source_output_index].append({
+            "node": target_node_id,
+            "type": "main",
+            "index": target_input_index
+        })
+
+        return await update_workflow(workflow_id, connections=connections)
+
+
+@mcp.tool()
+async def disconnect_nodes(
+    workflow_id: str,
+    source_node_id: str,
+    target_node_id: str
+) -> str:
+    """
+    Disconnect two nodes in a workflow.
+
+    Args:
+        workflow_id: ID of the workflow
+        source_node_id: ID of the source node
+        target_node_id: ID of the target node to disconnect
+
+    Returns:
+        JSON string with updated workflow
+    """
+    async with httpx.AsyncClient(
+        base_url=N8N_API_URL,
+        headers={"X-N8N-API-KEY": N8N_API_KEY},
+        timeout=30.0
+    ) as client:
+        get_response = await client.get(f"/workflows/{workflow_id}")
+        handle_api_error(get_response)
+        current = get_response.json()
+
+        connections = current.get("connections", {})
+
+        # Remove the connection
+        if source_node_id in connections:
+            main_outputs = connections[source_node_id].get("main", [])
+            for output_idx, connections_list in enumerate(main_outputs):
+                # Filter out the target connection
+                main_outputs[output_idx] = [
+                    conn for conn in connections_list
+                    if conn.get("node") != target_node_id
+                ]
+
+        return await update_workflow(workflow_id, connections=connections)
+
+
 # ==================== WORKFLOWS - CLONE/IMPORT/EXPORT ====================
 
 @mcp.tool()
